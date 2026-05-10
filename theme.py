@@ -5,9 +5,7 @@ import customtkinter as ctk
 import pyglet
 
 # ------------------------------------------------------------
-# FUENTES EXTERNAS
-# Coloca tus archivos .ttf / .otf en una carpeta "assets/fonts"
-# ------------------------------------------------------------
+
 pyglet.font.add_file("assets/fonts/StackSansNotch-Bold.ttf")
 pyglet.font.add_file("assets/fonts/StackSansNotch-ExtraLight.ttf")
 pyglet.font.add_file("assets/fonts/StackSansNotch-Light.ttf")
@@ -15,11 +13,7 @@ pyglet.font.add_file("assets/fonts/StackSansNotch-Medium.ttf")
 pyglet.font.add_file("assets/fonts/StackSansNotch-Regular.ttf")
 pyglet.font.add_file("assets/fonts/StackSansNotch-SemiBold.ttf")
 
-# ------------------------------------------------------------
-# MODO Y TEMA BASE
-# Opciones de appearance_mode: "light" | "dark" | "system"
-# Opciones de color_theme:     "blue"  | "green" | "dark-blue"
-# ------------------------------------------------------------
+
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
@@ -52,14 +46,9 @@ COLORES = {
     "borde":            "#2a2a4a",
 }
 
-# ------------------------------------------------------------
-# FUENTES  (se crean después de instanciar ctk.CTk())
-# ------------------------------------------------------------
+
 def cargar_fuentes() -> dict:
-    """
-    Llama esta función UNA VEZ, justo después de crear ctk.CTk().
-    Devuelve un diccionario con todas las fuentes listas para usar.
-    """
+
     return {
         # Títulos
         "titulo_xl":  ctk.CTkFont(family="StackSansNotch-Bold", size=40),
@@ -78,14 +67,9 @@ def cargar_fuentes() -> dict:
         "codigo":     ctk.CTkFont(family="StackSansNotch-Regular", size=13),
     }
 
-# ------------------------------------------------------------
-# ESTILOS DE WIDGETS  (kwargs listos para desempacar con **)
-# ------------------------------------------------------------
+
 def estilos(fuentes: dict) -> dict:
-    """
-    Devuelve estilos predefinidos para cada tipo de widget.
-    Uso: ctk.CTkLabel(app, **ESTILOS["label_titulo"], text="Hola")
-    """
+
     C = COLORES
     F = fuentes
     return {

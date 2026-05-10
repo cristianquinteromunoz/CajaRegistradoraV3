@@ -60,7 +60,9 @@ class Proveedor(Base):
     direccion    = Column(Text)
     activo       = Column(Boolean, default=True)
 
-    productos = relationship("Producto", back_populates="proveedor")
+    productos = relationship("Producto",     back_populates="proveedor")
+    ordenes   = relationship("OrdenCompra",  back_populates="proveedor")
+    cuenta    = relationship("CuentaProveedor", back_populates="proveedor")
 
 
 class Producto(Base):
@@ -161,9 +163,11 @@ class Usuario(Base):
     fecha_creacion = Column(DateTime, default=datetime.now)
     ultimo_acceso  = Column(DateTime)
 
-    rol    = relationship("Rol",   back_populates="usuarios")
-    ventas = relationship("Venta", back_populates="usuario")
+    rol             = relationship("Rol",          back_populates="usuarios")
+    ventas          = relationship("Venta",        back_populates="usuario")
     registro_gastos = relationship("RegistroGasto", back_populates="usuario")
+    turnos          = relationship("Turno",        back_populates="usuario")
+    nomina          = relationship("Nomina",        back_populates="usuario")
 
 
 # ============================================================
@@ -207,6 +211,84 @@ class RegistroGasto(Base):
 
     gasto   = relationship("GastoFijo", back_populates="registro_gastos")
     usuario = relationship("Usuario",   back_populates="registro_gastos")
+
+
+# ============================================================
+#  MÓDULO PERSONAL
+# ============================================================
+class Turno(Base):
+    __tablename__ = "turnos"
+
+    id_turno    = Column(Integer, primary_key=True, autoincrement=True)
+    id_usuario  = Column(Integer, ForeignKey("usuarios.id_usuario"))
+    dia_semana  = Column(String(20), nullable=False)  # Lunes, Martes...
+    hora_inicio = Column(String(10), nullable=False)  # "08:00"
+    hora_fin    = Column(String(10), nullable=False)  # "17:00"
+
+    usuario = relationship("Usuario", back_populates="turnos")
+
+
+class Nomina(Base):
+    __tablename__ = "nomina"
+
+    id_nomina   = Column(Integer, primary_key=True, autoincrement=True)
+    id_usuario  = Column(Integer, ForeignKey("usuarios.id_usuario"))
+    salario_base = Column(Float, nullable=False)
+    bonificacion = Column(Float, default=0)
+    deducciones  = Column(Float, default=0)
+    total_pago   = Column(Float, nullable=False)
+    periodo      = Column(String(20), nullable=False)  # "2024-05"
+    fecha_pago   = Column(DateTime, default=datetime.now)
+    observaciones = Column(Text)
+
+    usuario = relationship("Usuario", back_populates="nomina")
+
+
+# ============================================================
+#  MÓDULO PROVEEDORES (extendido)
+# ============================================================
+class OrdenCompra(Base):
+    __tablename__ = "ordenes_compra"
+
+    id_orden      = Column(Integer, primary_key=True, autoincrement=True)
+    id_proveedor  = Column(Integer, ForeignKey("proveedores.id_proveedor"))
+    id_usuario    = Column(Integer, ForeignKey("usuarios.id_usuario"))
+    fecha_orden   = Column(DateTime, default=datetime.now)
+    total         = Column(Float, default=0)
+    estado        = Column(String(30), default="pendiente")  # pendiente, recibida, cancelada
+    observaciones = Column(Text)
+
+    proveedor       = relationship("Proveedor", back_populates="ordenes")
+    usuario         = relationship("Usuario")
+    detalles        = relationship("DetalleOrden", back_populates="orden")
+
+
+class DetalleOrden(Base):
+    __tablename__ = "detalle_orden"
+
+    id_detalle   = Column(Integer, primary_key=True, autoincrement=True)
+    id_orden     = Column(Integer, ForeignKey("ordenes_compra.id_orden"))
+    id_producto  = Column(Integer, ForeignKey("productos.id_producto"))
+    cantidad     = Column(Float, nullable=False)
+    precio_unit  = Column(Float, nullable=False)
+    subtotal     = Column(Float, nullable=False)
+
+    orden    = relationship("OrdenCompra", back_populates="detalles")
+    producto = relationship("Producto")
+
+
+class CuentaProveedor(Base):
+    __tablename__ = "cuenta_proveedor"
+
+    id_cuenta    = Column(Integer, primary_key=True, autoincrement=True)
+    id_proveedor = Column(Integer, ForeignKey("proveedores.id_proveedor"))
+    concepto     = Column(String(200), nullable=False)
+    monto        = Column(Float, nullable=False)
+    tipo         = Column(String(10), nullable=False)   # "debito" | "credito"
+    fecha        = Column(DateTime, default=datetime.now)
+    saldo        = Column(Float, default=0)
+
+    proveedor = relationship("Proveedor", back_populates="cuenta")
 
 
 # ============================================================
