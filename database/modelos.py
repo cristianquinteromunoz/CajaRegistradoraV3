@@ -78,6 +78,7 @@ class Producto(Base):
     stock_minimo    = Column(Float, default=0)
     unidad_medida   = Column(String(50))
     codigo_barras   = Column(String(100), unique=True, nullable=True)
+    fecha_vencimiento = Column(DateTime, nullable=True)
     requiere_receta = Column(Boolean, default=False)
     activo          = Column(Boolean, default=True)
     fecha_creacion  = Column(DateTime, default=datetime.now)
@@ -302,6 +303,59 @@ class TipoVenta(Base):
     descripcion   = Column(Text)
 
     presentaciones = relationship("ProductoPresentacion", back_populates="tipo_venta")
+    detalles_venta = relationship("DetalleVenta",         back_populates="tipo_venta")
+
+
+class ProductoPresentacion(Base):
+    __tablename__ = "producto_presentaciones"
+
+    id_presentacion          = Column(Integer, primary_key=True, autoincrement=True)
+    id_producto              = Column(Integer, ForeignKey("productos.id_producto"))
+    id_tipo_venta            = Column(Integer, ForeignKey("tipos_venta.id_tipo_venta"))
+    cantidad_por_presentacion = Column(Float, nullable=False, default=1)  # 1 blister = 10 unidades
+    precio_venta             = Column(Float, nullable=False)
+    precio_con_descuento     = Column(Float)
+    porcentaje_descuento     = Column(Float, default=0)  # calculado automáticamente
+    activo                   = Column(Boolean, default=True)
+
+    producto   = relationship("Producto",  back_populates="presentaciones")
+    tipo_venta = relationship("TipoVenta", back_populates="presentaciones")
+
+
+class Venta(Base):
+    __tablename__ = "ventas"
+
+    id_venta        = Column(Integer, primary_key=True, autoincrement=True)
+    id_usuario      = Column(Integer, ForeignKey("usuarios.id_usuario"))
+    fecha_venta     = Column(DateTime, default=datetime.now)
+    subtotal        = Column(Float, nullable=False, default=0)
+    total_descuento = Column(Float, default=0)
+    total           = Column(Float, nullable=False, default=0)
+    metodo_pago     = Column(Enum(MetodoPago), default=MetodoPago.efectivo)
+    estado          = Column(Enum(EstadoVenta), default=EstadoVenta.completada)
+    observaciones   = Column(Text)
+
+    usuario  = relationship("Usuario",      back_populates="ventas")
+    detalles = relationship("DetalleVenta", back_populates="venta")
+
+
+class DetalleVenta(Base):
+    __tablename__ = "detalle_venta"
+
+    id_detalle           = Column(Integer, primary_key=True, autoincrement=True)
+    id_venta             = Column(Integer, ForeignKey("ventas.id_venta"))
+    id_producto          = Column(Integer, ForeignKey("productos.id_producto"))
+    id_tipo_venta        = Column(Integer, ForeignKey("tipos_venta.id_tipo_venta"))
+    cantidad             = Column(Float, nullable=False)
+    precio_unitario      = Column(Float, nullable=False)  # precio al momento de la venta
+    descuento_aplicado   = Column(Boolean, default=False)
+    porcentaje_descuento = Column(Float, default=0)
+    precio_con_descuento = Column(Float)
+    subtotal_linea       = Column(Float, nullable=False)
+
+    venta      = relationship("Venta",     back_populates="detalles")
+    producto   = relationship("Producto",  back_populates="detalles_venta")
+    tipo_venta = relationship("TipoVenta", back_populates="detalles_venta")
     detalles_venta = relationship("DetalleVenta",         back_populates="tipo_venta")
 
 
