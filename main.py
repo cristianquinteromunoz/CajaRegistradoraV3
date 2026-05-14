@@ -85,12 +85,17 @@ class VentanaPrincipal(ctk.CTk):
         icono_facturacion = ctk.CTkImage(Image.open("icon/facturacion.png"), size=(16, 16))
         icono_personal    = ctk.CTkImage(Image.open("icon/personal.png"),    size=(16, 16))
         icono_proveedores = ctk.CTkImage(Image.open("icon/ajustes.png"),     size=(16, 16))
+        icono_caja = ctk.CTkImage(Image.open("icon/caja.png"), size=(16, 16))
+        icono_dashboard = ctk.CTkImage(Image.open("icon/dashboard.png"), size=(16, 16))
 
+        # Agrega al inicio de la lista de navegación
         for texto, icono, comando in [
-            ("Inventario",  icono_inventario,  self._abrir_inventario),
+            ("Inventario", icono_inventario, self._abrir_inventario),
             ("Facturación", icono_facturacion, self._abrir_facturacion),
-            ("Personal",    icono_personal,    self._abrir_personal),
+            ("Personal", icono_personal, self._abrir_personal),
             ("Proveedores", icono_proveedores, self._abrir_proveedores),
+            ("Cierre de caja", icono_caja, self._abrir_cierre),
+            ("Dashboard", icono_dashboard, self._abrir_dashboard),
         ]:
             ctk.CTkButton(
                 self.barra_top, text=texto, image=icono,
@@ -134,8 +139,17 @@ class VentanaPrincipal(ctk.CTk):
     #  NAVEGACIÓN
     # ==========================================================
     def _cambiar_vista(self, vista_clase, **kwargs):
+        # Ocultar todas las vistas actuales
         for w in self.frame_contenido.winfo_children():
-            w.destroy()
+            w.grid_remove()
+
+        # Buscar si ya existe una instancia de esta vista
+        for w in self.frame_contenido.winfo_children():
+            if isinstance(w, vista_clase):
+                w.grid()
+                return
+
+        # Si no existe, crearla
         vista = vista_clase(
             self.frame_contenido,
             fuentes=self.F,
@@ -143,7 +157,7 @@ class VentanaPrincipal(ctk.CTk):
             colores=self.C,
             **kwargs
         )
-        vista.pack(fill="both", expand=True)
+        vista.grid(row=0, column=0, sticky="nsew")
 
     def _abrir_inventario(self):
         from views.inventario_frame import InventarioFrame
@@ -160,6 +174,14 @@ class VentanaPrincipal(ctk.CTk):
     def _abrir_proveedores(self):
         from views.proveedores_frame import ProveedoresFrame
         self._cambiar_vista(ProveedoresFrame, id_usuario=self.usuario_actual.id_usuario)
+
+    def _abrir_dashboard(self):
+        from views.dashboard_frame import DashboardFrame
+        self._cambiar_vista(DashboardFrame)
+
+    def _abrir_cierre(self):
+        from views.cierre_caja_frame import CierreCajaFrame
+        self._cambiar_vista(CierreCajaFrame, id_usuario=self.usuario_actual.id_usuario)
 
 
 ventana = VentanaPrincipal()
