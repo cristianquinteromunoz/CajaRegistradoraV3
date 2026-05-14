@@ -73,6 +73,21 @@ class ProductosService:
             .all()
         )
 
+    def productos_proximos_vencer(self, dias: int = 30) -> list[Producto]:
+        """Productos que vencen en los próximos N días."""
+        from datetime import datetime, timedelta
+        limite = datetime.now() + timedelta(days=dias)
+        return (
+            self.session.query(Producto)
+            .filter(
+                Producto.fecha_vencimiento != None,
+                Producto.fecha_vencimiento <= limite,
+                Producto.activo == True,
+            )
+            .order_by(Producto.fecha_vencimiento)
+            .all()
+        )
+
     def descontar_stock(self, id_producto: int, cantidad: float) -> bool:
         producto = self.obtener_por_id(id_producto)
         if not producto or producto.stock_actual < cantidad:
