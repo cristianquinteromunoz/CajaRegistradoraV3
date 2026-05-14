@@ -4,7 +4,7 @@
 import customtkinter as ctk
 from tkinter import ttk, messagebox
 from database.conexion import get_session
-from servicios.productos_services import ProductosService
+from servicios.productos_service import ProductosService
 
 
 class InventarioFrame(ctk.CTkFrame):
@@ -366,10 +366,22 @@ class InventarioFrame(ctk.CTkFrame):
             cat_obj  = next((c for c in categorias  if c.nombre == var_cat.get()),  None)
             prov_obj = next((p for p in proveedores if p.nombre == var_prov.get()), None)
 
+            from datetime import datetime
+            venc_str = e_venc.get().strip()
+            fecha_venc = None
+            if venc_str:
+                try:
+                    fecha_venc = datetime.strptime(venc_str, "%Y-%m-%d")
+                except ValueError:
+                    from tkinter import messagebox
+                    messagebox.showerror("Error", "Formato de fecha inválido. Usa YYYY-MM-DD.", parent=d)
+                    return
+
             datos = {
-                "nombre":          nombre,
-                "codigo_barras":   e_barras.get().strip() or None,
-                "descripcion":     e_desc.get().strip(),
+                "nombre":             nombre,
+                "codigo_barras":      e_barras.get().strip() or None,
+                "descripcion":        e_desc.get().strip(),
+                "fecha_vencimiento":  fecha_venc,
                 "precio_compra":   precio_c,
                 "stock_actual":    stock,
                 "stock_minimo":    stk_min,
@@ -400,87 +412,142 @@ class InventarioFrame(ctk.CTkFrame):
 
         d = ctk.CTkToplevel(self)
         d.title(f"Presentaciones — {producto.nombre}")
-        d.geometry("620x500")
+        d.geometry("660x540")
         d.grab_set()
         d.configure(fg_color=self.C["fondo_principal"])
 
         ctk.CTkLabel(d, text=f"Presentaciones de {producto.nombre}",
                      **self.E["label_titulo"]).pack(pady=(20, 4))
-        ctk.CTkLabel(d, text="Define cómo se puede vender este producto",
-                     **self.E["label_subtitulo"]).pack(pady=(0, 12))
+        ctk.CTkLabel(d, text="El porcentaje de descuento se calcula automáticamente",
+                     **self.E["label_subtitulo"]).pack(pady=(0, 10))
 
-        # Tabla de presentaciones
+        # ── Tabla de presentaciones existentes ────────────────
         cols = ("tipo", "cantidad", "precio", "precio_desc", "descuento")
         tabla_p = ttk.Treeview(d, columns=cols, show="headings",
                                style="Inv.Treeview", height=6)
         for col, titulo, ancho in [
-            ("tipo",       "Tipo",            120),
-            ("cantidad",   "Unidades/present.",130),
-            ("precio",     "Precio base",      110),
-            ("precio_desc","Precio descuento", 120),
-            ("descuento",  "% Descuento",      100),
+            ("tipo",       "Tipo",             130),
+            ("cantidad",   "Unidades/present.", 130),
+            ("precio",     "Precio base",       110),
+            ("precio_desc","Precio c/descuento",130),
+            ("descuento",  "% Descuento",       100),
         ]:
             tabla_p.heading(col, text=titulo, anchor="center")
             tabla_p.column(col, width=ancho, anchor="center")
         tabla_p.pack(fill="x", padx=20)
 
-        def refrescar_presentaciones():
+        def refrescar():
             tabla_p.delete(*tabla_p.get_children())
             for p in self.svc.obtener_presentaciones(producto.id_producto):
+                pct = ((p.precio_venta - p.precio_con_descuento) / p.precio_venta * 100
+                       if p.precio_con_descuento else 0)
                 tabla_p.insert("", "end", iid=p.id_presentacion, values=(
                     p.tipo_venta.nombre if p.tipo_venta else "—",
                     p.cantidad_por_presentacion,
                     f"${p.precio_venta:,.0f}",
-                    f"${p.precio_con_descuento:,.0f}" if p.precio_con_descuento else "—",
-                    f"{p.porcentaje_descuento:.1f}%" if p.porcentaje_descuento else "0%",
+                    f"${p.precio_con_descuento:,.0f}" if p.precio_con_descuento else "Sin descuento",
+                    f"{pct:.1f}%" if pct else "—",
                 ))
 
-        refrescar_presentaciones()
+        refrescar()
 
-        # Formulario nueva presentación
+        # ── Botón eliminar presentación ───────────────────────
+        def eliminar_presentacion():
+            sel = tabla_p.selection()
+            if not sel:
+                return
+            from tkinter import messagebox
+            if messagebox.askyesno("Eliminar", "¿Eliminar esta presentación?", parent=d):
+                self.svc.actualizar_presentacion(int(sel[0]), {"activo": False})
+                refrescar()
+
+        ctk.CTkButton(d, text="🗑 Eliminar seleccionada",
+                      command=eliminar_presentacion,
+                      fg_color=self.C["error"], hover_color="#c0392b",
+                      text_color="#fff", font=self.F["boton"],
+                      corner_radius=8, height=32).pack(anchor="e", padx=20, pady=(4, 0))
+
+        # ── Formulario nueva presentación ─────────────────────
         form = ctk.CTkFrame(d, **self.E["frame_tarjeta"])
         form.pack(fill="x", padx=20, pady=12)
         form.grid_columnconfigure((0, 1, 2, 3), weight=1)
 
         from database.modelos import TipoVenta as TipoVentaModel
-        tipos      = self.session.query(TipoVentaModel).all()
-        var_tipo   = ctk.StringVar(value=tipos[0].nombre if tipos else "")
+        tipos    = self.session.query(TipoVentaModel).all()
+        var_tipo = ctk.StringVar(value=tipos[0].nombre if tipos else "")
 
-        ctk.CTkLabel(form, text="Tipo", **self.E["label_cuerpo"]).grid(row=0, column=0, padx=8, sticky="w")
-        ctk.CTkLabel(form, text="Unidades", **self.E["label_cuerpo"]).grid(row=0, column=1, padx=8, sticky="w")
-        ctk.CTkLabel(form, text="Precio base", **self.E["label_cuerpo"]).grid(row=0, column=2, padx=8, sticky="w")
-        ctk.CTkLabel(form, text="% Descuento", **self.E["label_cuerpo"]).grid(row=0, column=3, padx=8, sticky="w")
+        # Encabezados
+        for col, txt in enumerate(["Tipo", "Unidades/present.", "Precio base $", "Precio c/descuento $"]):
+            ctk.CTkLabel(form, text=txt, **self.E["label_cuerpo"]).grid(
+                row=0, column=col, padx=8, pady=(10, 2), sticky="w")
 
         ctk.CTkComboBox(form, values=[t.nombre for t in tipos],
                         variable=var_tipo, font=self.F["cuerpo_md"],
-                        width=130).grid(row=1, column=0, padx=8, pady=6, sticky="ew")
-        e_cant  = ctk.CTkEntry(form, **self.E["entry"]); e_cant.grid( row=1, column=1, padx=8, pady=6, sticky="ew")
-        e_prec  = ctk.CTkEntry(form, **self.E["entry"]); e_prec.grid( row=1, column=2, padx=8, pady=6, sticky="ew")
-        e_desc  = ctk.CTkEntry(form, **self.E["entry"]); e_desc.grid( row=1, column=3, padx=8, pady=6, sticky="ew")
+                        width=130).grid(row=1, column=0, padx=8, pady=(0, 10), sticky="ew")
 
-        def agregar_presentacion():
+        e_cant  = ctk.CTkEntry(form, **self.E["entry"])
+        e_cant.grid(row=1, column=1, padx=8, pady=(0, 10), sticky="ew")
+        e_cant.insert(0, "1")
+
+        e_prec  = ctk.CTkEntry(form, **self.E["entry"])
+        e_prec.grid(row=1, column=2, padx=8, pady=(0, 10), sticky="ew")
+
+        e_desc  = ctk.CTkEntry(form, placeholder_text="Opcional",
+                               **self.E["entry"])
+        e_desc.grid(row=1, column=3, padx=8, pady=(0, 10), sticky="ew")
+
+        # Label que muestra el % calculado en tiempo real
+        lbl_pct = ctk.CTkLabel(form, text="", font=self.F["cuerpo_sm"],
+                               text_color=self.C["exito"])
+        lbl_pct.grid(row=2, column=2, columnspan=2, sticky="w", padx=8, pady=(0, 8))
+
+        def calcular_pct(*_):
             try:
-                tipo_obj   = next(t for t in tipos if t.nombre == var_tipo.get())
-                cantidad   = float(e_cant.get())
-                precio     = float(e_prec.get())
-                pct        = float(e_desc.get() or 0)
-                precio_dto = round(precio * (1 - pct / 100), 2) if pct > 0 else None
+                base = float(e_prec.get())
+                dto  = float(e_desc.get())
+                if base > 0 and dto < base:
+                    pct = (base - dto) / base * 100
+                    lbl_pct.configure(text=f"Descuento: {pct:.1f}%")
+                else:
+                    lbl_pct.configure(text="")
+            except ValueError:
+                lbl_pct.configure(text="")
+
+        e_prec.bind("<KeyRelease>", calcular_pct)
+        e_desc.bind("<KeyRelease>", calcular_pct)
+
+        def agregar():
+            try:
+                tipo_obj = next(t for t in tipos if t.nombre == var_tipo.get())
+                cant     = float(e_cant.get())
+                precio   = float(e_prec.get())
+                desc_str = e_desc.get().strip()
+                precio_dto = float(desc_str) if desc_str else None
+                if precio_dto and precio_dto >= precio:
+                    from tkinter import messagebox
+                    messagebox.showerror("Error",
+                        "El precio con descuento debe ser menor al precio base.", parent=d)
+                    return
+                pct = ((precio - precio_dto) / precio * 100) if precio_dto else 0
             except (ValueError, StopIteration):
+                from tkinter import messagebox
                 messagebox.showerror("Error", "Completa los campos correctamente.", parent=d)
                 return
 
             self.svc.crear_presentacion({
-                "id_producto":               producto.id_producto,
-                "id_tipo_venta":             tipo_obj.id_tipo_venta,
-                "cantidad_por_presentacion": cantidad,
-                "precio_venta":              precio,
-                "precio_con_descuento":      precio_dto,
-                "porcentaje_descuento":      pct,
+                "id_producto":                producto.id_producto,
+                "id_tipo_venta":              tipo_obj.id_tipo_venta,
+                "cantidad_por_presentacion":  cant,
+                "precio_venta":               precio,
+                "precio_con_descuento":       precio_dto,
+                "porcentaje_descuento":       round(pct, 2),
             })
-            refrescar_presentaciones()
-            for e in (e_cant, e_prec, e_desc):
-                e.delete(0, "end")
+            refrescar()
+            e_cant.delete(0, "end"); e_cant.insert(0, "1")
+            e_prec.delete(0, "end")
+            e_desc.delete(0, "end")
+            lbl_pct.configure(text="")
 
         ctk.CTkButton(d, text="＋ Agregar presentación",
-                      command=agregar_presentacion,
-                      **self.E["boton_primario"]).pack(padx=20, pady=(0, 16), fill="x")
+                      command=agregar, **self.E["boton_primario"]).pack(
+            fill="x", padx=20, pady=(0, 16))
